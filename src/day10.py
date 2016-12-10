@@ -1,5 +1,4 @@
 import re
-from functools import reduce
 
 ASSIGNMENT_REGEX = re.compile('value (\d+) goes to bot (\d+)')
 MOVE_REGEX = re.compile('bot (\d+) gives low to (bot|output) (\d+) and high to (bot|output) (\d+)')
@@ -8,10 +7,10 @@ BOT, OUT = 'bot', 'output'
 
 class Bot:
     def __init__(self, bot_id):
+        self._bot_id = bot_id
         self._values = []
         self._low_target = None
         self._high_target = None
-        self._bot_id = bot_id
 
     def add_value(self, value):
         self._values.append(value)
@@ -64,11 +63,11 @@ class BotNetwork:
         self._bots = {}
         self._outputs = {}
 
-    def update(self, line):
-        assignment_match = ASSIGNMENT_REGEX.match(line)
+    def update(self, rule_line):
+        assignment_match = ASSIGNMENT_REGEX.match(rule_line)
         if assignment_match:
             self._update_assignments(assignment_match)
-        move_match = MOVE_REGEX.match(line)
+        move_match = MOVE_REGEX.match(rule_line)
         if move_match:
             self._update_move_rules(move_match)
 
@@ -76,40 +75,35 @@ class BotNetwork:
         value, bot_id = match.groups()
         value = int(value)
         bot_id = int(bot_id)
-        if bot_id not in self._bots:
-            self._bots[bot_id] = Bot(bot_id)
-        self._bots[bot_id].add_value(value)
+        self._get_or_create_bot(bot_id).add_value(value)
 
     def _update_move_rules(self, match):
         bot_id, low_dst_type, low_dst, high_dst_type, high_dst = match.groups()
         bot_id = int(bot_id)
         low_dst = int(low_dst)
         high_dst = int(high_dst)
+
+        low_dst_obj = self._get_or_create_destination_object(low_dst_type, low_dst)
+        high_dst_obj = self._get_or_create_destination_object(high_dst_type, high_dst)
+        self._get_or_create_bot(bot_id).set_targets(low_dst_obj, high_dst_obj)
+
+    def _get_or_create_bot(self, bot_id):
         if bot_id not in self._bots:
             self._bots[bot_id] = Bot(bot_id)
+        return self._bots[bot_id]
 
-        low_dst_obj = high_dst_obj = None
-        if low_dst_type == OUT:
-            if low_dst not in self._outputs:
-                self._outputs[low_dst] = Output(low_dst)
-            low_dst_obj = self._outputs[low_dst]
+    def _get_or_create_output(self, output_id):
+        if output_id not in self._outputs:
+            self._outputs[output_id] = Output(output_id)
+        return self._outputs[output_id]
 
-        if low_dst_type == BOT:
-            if low_dst not in self._bots:
-                self._bots[low_dst] = Bot(low_dst)
-            low_dst_obj = self._bots[low_dst]
-
-        if high_dst_type == OUT:
-            if high_dst not in self._outputs:
-                self._outputs[high_dst] = Output(high_dst)
-            high_dst_obj = self._outputs[high_dst]
-
-        if high_dst_type == BOT:
-            if high_dst not in self._bots:
-                self._bots[high_dst] = Bot(high_dst)
-            high_dst_obj = self._bots[high_dst]
-
-        self._bots[bot_id].set_targets(low_dst_obj, high_dst_obj)
+    def _get_or_create_destination_object(self, destination_type, destination_id):
+        if destination_type == OUT:
+            return self._get_or_create_output(destination_id)
+        elif destination_type == BOT:
+            return self._get_or_create_bot(destination_id)
+        else:
+            raise RuntimeError(destination_type)
 
     def run(self):
         while True:
@@ -120,6 +114,10 @@ class BotNetwork:
             else:
                 return
 
+    @property
+    def outputs(self):
+        return self._outputs
+
 
 n = BotNetwork()
 with open('../data/day10.txt') as f:
@@ -127,5 +125,5 @@ with open('../data/day10.txt') as f:
         n.update(line)
 n.run()
 
-o = n._outputs
+o = n.outputs
 print(o[0].value * o[1].value * o[2].value)
