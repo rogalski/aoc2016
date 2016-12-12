@@ -1,7 +1,3 @@
-CPY_RGX = "cpy (\d+|a|b|c|d) (\d+|a|b|c|d)"
-CPY_RGX = "cpy (\d+|a|b|c|d) (\d+|a|b|c|d)"
-
-
 class Interpreter:
     def __init__(self, file_object, registers_init_values=(0, 0, 0, 0)):
         self.registers = dict(zip('abcd', registers_init_values))
@@ -38,9 +34,6 @@ class Interpreter:
 
     def __str__(self):
         return "<Interpreter: ({})>".format(" ".join(str(self.registers[k]) for k in "abcd"))
-
-    def exec_instruction(self, instruction):
-        pass
 
 
 with open('../data/day12_test.txt') as f:
